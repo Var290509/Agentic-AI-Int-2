@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export type Lane = 'north' | 'east' | 'south' | 'west';
 export type LightState = 'RED' | 'YELLOW' | 'GREEN';
@@ -32,6 +33,11 @@ export class CitySimulation {
   public renderer: THREE.WebGLRenderer;
   private animationFrameId: number | null = null;
   private clock: THREE.Clock;
+
+  // 3D GLTF Model Assets Loader & Cache
+  private gltfLoader: GLTFLoader = new GLTFLoader();
+  private gltfModels: Record<string, THREE.Group> = {};
+  public assetsLoadedCount: number = 0;
 
   // Environment & Lighting
   private sunLight: THREE.DirectionalLight;
@@ -169,6 +175,94 @@ export class CitySimulation {
     this.createBuildings();
     this.createStreetLamps();
     this.createTrafficLights();
+    this.load3DAssets();
+  }
+
+  private load3DAssets() {
+    const assetsToLoad = [
+      { name: 'truck_red', url: '/models/truck_red.glb', scale: 3.2 },
+      { name: 'truck_yellow', url: '/models/truck_yellow.glb', scale: 3.2 },
+      { name: 'truck_cesium', url: '/models/truck_cesium.glb', scale: 1.0 },
+      { name: 'building_a', url: '/models/building_a.glb', scale: 7.0 },
+      { name: 'building_b', url: '/models/building_b.glb', scale: 7.0 },
+      { name: 'building_c', url: '/models/building_c.glb', scale: 7.0 },
+      { name: 'trees', url: '/models/trees.glb', scale: 4.0 },
+      { name: 'fountain', url: '/models/fountain.glb', scale: 3.5 },
+      { name: 'traffic_cone', url: '/models/traffic_cone.glb', scale: 0.8 },
+    ];
+
+    assetsToLoad.forEach(({ name, url, scale }) => {
+      this.gltfLoader.load(
+        url,
+        (gltf) => {
+          const root = gltf.scene;
+          root.scale.set(scale, scale, scale);
+          root.traverse((child) => {
+            if ((child as THREE.Mesh).isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+          this.gltfModels[name] = root;
+          this.assetsLoadedCount++;
+
+          if (name.startsWith('building_')) {
+            this.placeGLTFBuildings(name, root);
+          } else if (name === 'trees' || name === 'fountain') {
+            this.placeCityProps(name, root);
+          }
+        },
+        undefined,
+        (err) => console.warn(`Asset ${name} notice:`, err)
+      );
+    });
+  }
+
+  private placeGLTFBuildings(name: string, template: THREE.Group) {
+    const positions = [
+      { x: 26, z: 26, rot: 0 },
+      { x: -26, z: 26, rot: Math.PI / 2 },
+      { x: 26, z: -26, rot: -Math.PI / 2 },
+      { x: -26, z: -26, rot: Math.PI },
+      { x: 44, z: 26, rot: 0 },
+      { x: -44, z: 26, rot: Math.PI / 2 },
+    ];
+
+    positions.forEach((p, idx) => {
+      if (
+        (idx % 3 === 0 && name === 'building_a') ||
+        (idx % 3 === 1 && name === 'building_b') ||
+        (idx % 3 === 2 && name === 'building_c')
+      ) {
+        const clone = template.clone();
+        clone.position.set(p.x, 0.3, p.z);
+        clone.rotation.y = p.rot;
+        this.scene.add(clone);
+      }
+    });
+  }
+
+  private placeCityProps(name: string, template: THREE.Group) {
+    const propPositions = [
+      { x: 14, z: 14 },
+      { x: -14, z: 14 },
+      { x: 14, z: -14 },
+      { x: -14, z: -14 },
+      { x: 30, z: 14 },
+      { x: -30, z: 14 },
+    ];
+
+    propPositions.forEach((pos, i) => {
+      if (name === 'fountain' && i === 0) {
+        const fountain = template.clone();
+        fountain.position.set(pos.x, 0.3, pos.z);
+        this.scene.add(fountain);
+      } else if (name === 'trees') {
+        const tree = template.clone();
+        tree.position.set(pos.x, 0.3, pos.z);
+        this.scene.add(tree);
+      }
+    });
   }
 
   private createRoadTexture(): THREE.CanvasTexture {
@@ -582,48 +676,69 @@ export class CitySimulation {
       bodyHeight = 1.8;
     }
 
-    // Chassis / Body
-    const bodyGeo = new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyLength);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: carColor,
-      roughness: 0.25,
-      metalness: 0.75,
-    });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = bodyHeight / 2 + 0.35;
-    body.castShadow = true;
-    body.receiveShadow = true;
-    group.add(body);
+    // Use actual 3D GLTF model if loaded, otherwise procedural vehicle
+    let usedGLTF = false;
+    if (this.gltfModels['truck_cesium'] && type === 'bus') {
+      const model = this.gltfModels['truck_cesium'].clone();
+      model.rotation.y = Math.PI;
+      group.add(model);
+      usedGLTF = true;
+    } else if (this.gltfModels['truck_red'] && (type === 'suv' || isAmbulance)) {
+      const model = this.gltfModels['truck_red'].clone();
+      model.rotation.y = Math.PI;
+      group.add(model);
+      usedGLTF = true;
+    } else if (this.gltfModels['truck_yellow'] && Math.random() > 0.4) {
+      const model = this.gltfModels['truck_yellow'].clone();
+      model.rotation.y = Math.PI;
+      group.add(model);
+      usedGLTF = true;
+    }
 
-    // Cabin Windows
-    const cabinGeo = new THREE.BoxGeometry(bodyWidth * 0.9, bodyHeight * 0.7, bodyLength * 0.55);
-    const cabinMat = new THREE.MeshStandardMaterial({
-      color: 0x090d16,
-      roughness: 0.1,
-      metalness: 0.9,
-    });
-    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
-    cabin.position.y = bodyHeight + 0.25;
-    group.add(cabin);
+    if (!usedGLTF) {
+      // Chassis / Body
+      const bodyGeo = new THREE.BoxGeometry(bodyWidth, bodyHeight, bodyLength);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: carColor,
+        roughness: 0.25,
+        metalness: 0.75,
+      });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = bodyHeight / 2 + 0.35;
+      body.castShadow = true;
+      body.receiveShadow = true;
+      group.add(body);
 
-    // Wheels (4)
-    const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 16);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
-    const wheelZ = bodyLength * 0.32;
-    const wheelX = bodyWidth / 2 + 0.05;
+      // Cabin Windows
+      const cabinGeo = new THREE.BoxGeometry(bodyWidth * 0.9, bodyHeight * 0.7, bodyLength * 0.55);
+      const cabinMat = new THREE.MeshStandardMaterial({
+        color: 0x090d16,
+        roughness: 0.1,
+        metalness: 0.9,
+      });
+      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+      cabin.position.y = bodyHeight + 0.25;
+      group.add(cabin);
 
-    [
-      { x: wheelX, z: wheelZ },
-      { x: -wheelX, z: wheelZ },
-      { x: wheelX, z: -wheelZ },
-      { x: -wheelX, z: -wheelZ },
-    ].forEach((wPos) => {
-      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(wPos.x, 0.38, wPos.z);
-      wheel.castShadow = true;
-      group.add(wheel);
-    });
+      // Wheels (4)
+      const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 16);
+      const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.9 });
+      const wheelZ = bodyLength * 0.32;
+      const wheelX = bodyWidth / 2 + 0.05;
+
+      [
+        { x: wheelX, z: wheelZ },
+        { x: -wheelX, z: wheelZ },
+        { x: wheelX, z: -wheelZ },
+        { x: -wheelX, z: -wheelZ },
+      ].forEach((wPos) => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wPos.x, 0.38, wPos.z);
+        wheel.castShadow = true;
+        group.add(wheel);
+      });
+    }
 
     // Headlights
     const headLightL = new THREE.SpotLight(0xfffbeb, 1.8, 25, Math.PI / 6, 0.3);
@@ -743,6 +858,22 @@ export class CitySimulation {
     v2.mesh.position.x += 1.2;
 
     this.createSmokeParticles(0, 1.5, 0);
+
+    // Spawn 3D Traffic Cones around accident site
+    if (this.gltfModels['traffic_cone']) {
+      const conePositions = [
+        { x: 3.5, z: 3.5 },
+        { x: -3.5, z: 3.5 },
+        { x: 3.5, z: -3.5 },
+        { x: -3.5, z: -3.5 },
+      ];
+      conePositions.forEach((cp) => {
+        const cone = this.gltfModels['traffic_cone'].clone();
+        cone.position.set(cp.x, 0.05, cp.z);
+        cone.name = 'accidentCone';
+        this.scene.add(cone);
+      });
+    }
   }
 
   public clearAccident() {
@@ -751,6 +882,9 @@ export class CitySimulation {
       this.scene.remove(this.smokeParticles);
       this.smokeParticles = null;
     }
+    // Remove accident cones
+    const cones = this.scene.children.filter((c) => c.name === 'accidentCone');
+    cones.forEach((c) => this.scene.remove(c));
   }
 
   private createSmokeParticles(x: number, y: number, z: number) {
