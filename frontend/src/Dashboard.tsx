@@ -401,7 +401,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Left Collapsible Drawer: Operational Widgets (Widget 1 & Widget 4) */}
       {showLeftDrawer && (
-        <aside className="absolute top-20 left-4 bottom-4 w-96 z-10 flex flex-col gap-3 overflow-y-auto pr-1 pointer-events-auto transition-all">
+        <aside className="absolute top-20 left-4 bottom-4 w-80 z-10 flex flex-col gap-3 overflow-y-auto pr-1 pointer-events-auto transition-all">
           <Widget1IntersectionTimer
             currentLane={isPreempted && preemptedLane ? preemptedLane : CYCLE_ORDER[cycleIndex]}
             phase={phase}
@@ -424,7 +424,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Right Collapsible Drawer: Governance & Safety Widgets (Widget 2 & Widget 3) or Simulation Controls */}
       {showRightDrawer && (
-        <aside className="absolute top-20 right-4 bottom-4 w-[420px] z-10 flex flex-col gap-3 overflow-y-auto pl-1 pointer-events-auto transition-all">
+        <aside className="absolute top-20 right-4 bottom-4 w-[360px] z-10 flex flex-col gap-3 overflow-y-auto pl-1 pointer-events-auto transition-all">
           {/* Tab Switcher: Operations vs Simulation Controls */}
           <div className="glass-panel rounded-lg p-1 flex gap-1 font-mono text-xs">
             <button

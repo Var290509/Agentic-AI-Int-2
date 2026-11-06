@@ -79,9 +79,9 @@ export class CitySimulation {
   private prevMouseX: number = 0;
   private prevMouseY: number = 0;
   private spherical: { radius: number; theta: number; phi: number } = {
-    radius: 70,
+    radius: 110,
     theta: Math.PI / 4,
-    phi: Math.PI / 3,
+    phi: Math.PI / 4, // 45° elevated panoramic view
   };
 
   private lastSpawnTimes: Record<Lane, number> = {
@@ -98,10 +98,10 @@ export class CitySimulation {
     const width = container.clientWidth || window.innerWidth || 1280;
     const height = container.clientHeight || window.innerHeight || 800;
 
-    // 1. Scene
+    // 1. Scene with rich atmosphere
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x050811);
-    this.scene.fog = new THREE.FogExp2(0x050811, 0.008);
+    this.scene.background = new THREE.Color(0x1e293b);
+    this.scene.fog = new THREE.FogExp2(0x1e293b, 0.002);
 
     // 2. Camera
     this.camera = new THREE.PerspectiveCamera(
@@ -119,7 +119,7 @@ export class CitySimulation {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMappingExposure = 1.1;
     
     // Ensure canvas expands full container
     this.renderer.domElement.style.width = '100%';
@@ -127,14 +127,14 @@ export class CitySimulation {
     this.renderer.domElement.style.display = 'block';
     container.appendChild(this.renderer.domElement);
 
-    // 4. Setup Lighting
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    // 4. Setup Lighting - Bright, vibrant daylight
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
     this.scene.add(this.ambientLight);
 
-    this.hemiLight = new THREE.HemisphereLight(0x7090b0, 0x111122, 0.4);
+    this.hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x1e293b, 0.8);
     this.scene.add(this.hemiLight);
 
-    this.sunLight = new THREE.DirectionalLight(0xfffaed, 1.5);
+    this.sunLight = new THREE.DirectionalLight(0xfffbeb, 2.5);
     this.sunLight.castShadow = true;
     this.sunLight.shadow.mapSize.width = 2048;
     this.sunLight.shadow.mapSize.height = 2048;
@@ -313,8 +313,8 @@ export class CitySimulation {
     const roadWidth = 18;
     const roadLength = 180;
     const roadMat = new THREE.MeshStandardMaterial({
-      color: 0x1e2430,
-      roughness: 0.85,
+      color: 0x334155,
+      roughness: 0.6,
       metalness: 0.1,
     });
 
@@ -336,8 +336,8 @@ export class CitySimulation {
     // Ground Plane around roads
     const groundGeo = new THREE.PlaneGeometry(300, 300);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x0a0f1d,
-      roughness: 0.9,
+      color: 0x1e293b,
+      roughness: 0.8,
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
@@ -494,10 +494,10 @@ export class CitySimulation {
       }
     };
 
-    generateCluster(35, 35);
-    generateCluster(-35, 35);
-    generateCluster(35, -35);
-    generateCluster(-35, -35);
+    generateCluster(55, 55);
+    generateCluster(-55, 55);
+    generateCluster(55, -55);
+    generateCluster(-55, -55);
   }
 
   private createStreetLamps() {
@@ -931,20 +931,20 @@ export class CitySimulation {
 
     // Sky & Ambient Colors
     if (norm > 0.7) {
-      // Midday Clear
-      this.scene.background = new THREE.Color(0x0f172a);
-      this.ambientLight.intensity = 0.5;
-      this.renderer.toneMappingExposure = 1.0;
+      // Midday Clear - vivid bright city sky
+      this.scene.background = new THREE.Color(0x38bdf8);
+      this.ambientLight.intensity = 1.2;
+      this.renderer.toneMappingExposure = 1.1;
     } else if (norm >= 0.3) {
-      // Twilight / Dusk
-      this.scene.background = new THREE.Color(0x180f28);
-      this.ambientLight.intensity = 0.3;
-      this.renderer.toneMappingExposure = 0.9;
+      // Twilight / Dusk - deep indigo sunset
+      this.scene.background = new THREE.Color(0x312e81);
+      this.ambientLight.intensity = 0.8;
+      this.renderer.toneMappingExposure = 1.0;
     } else {
-      // Deep Night
-      this.scene.background = new THREE.Color(0x050811);
-      this.ambientLight.intensity = 0.15;
-      this.renderer.toneMappingExposure = 0.8;
+      // Deep Night - dark blue starfield night
+      this.scene.background = new THREE.Color(0x0a1128);
+      this.ambientLight.intensity = 0.5;
+      this.renderer.toneMappingExposure = 0.9;
     }
 
     // Street Lamps Energy Logic
