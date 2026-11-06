@@ -89,6 +89,9 @@ export class CitySimulation {
     this.container = container;
     this.clock = new THREE.Clock();
 
+    const width = container.clientWidth || window.innerWidth || 1280;
+    const height = container.clientHeight || window.innerHeight || 800;
+
     // 1. Scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x050811);
@@ -97,7 +100,7 @@ export class CitySimulation {
     // 2. Camera
     this.camera = new THREE.PerspectiveCamera(
       45,
-      container.clientWidth / container.clientHeight,
+      width / height,
       0.5,
       500
     );
@@ -105,12 +108,17 @@ export class CitySimulation {
 
     // 3. Renderer with high-graphics shadows & tone mapping
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setSize(container.clientWidth, container.clientHeight);
+    this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
+    
+    // Ensure canvas expands full container
+    this.renderer.domElement.style.width = '100%';
+    this.renderer.domElement.style.height = '100%';
+    this.renderer.domElement.style.display = 'block';
     container.appendChild(this.renderer.domElement);
 
     // 4. Setup Lighting
@@ -138,7 +146,17 @@ export class CitySimulation {
     this.setupEventListeners();
     this.updateLighting(this.config.daylightPercent);
 
-    // 6. Start Loop
+    // 6. Spawn initial active vehicles across all 4 lanes so the scene is alive immediately
+    this.spawnVehicle('north', 'sedan', -22);
+    this.spawnVehicle('north', 'suv', -45);
+    this.spawnVehicle('east', 'bus', -28);
+    this.spawnVehicle('east', 'sedan', -55);
+    this.spawnVehicle('south', 'suv', -18);
+    this.spawnVehicle('south', 'sedan', -40);
+    this.spawnVehicle('west', 'sedan', -25);
+    this.spawnVehicle('west', 'ambulance', -50);
+
+    // 7. Start Loop
     this.animate();
   }
 
@@ -539,7 +557,11 @@ export class CitySimulation {
   // --------------------------------------------------------------------------
   // Vehicle Generation & Autonomous Simulation
   // --------------------------------------------------------------------------
-  public spawnVehicle(lane: Lane, type: 'sedan' | 'suv' | 'bus' | 'ambulance' = 'sedan') {
+  public spawnVehicle(
+    lane: Lane,
+    type: 'sedan' | 'suv' | 'bus' | 'ambulance' = 'sedan',
+    initialDistance: number = -75
+  ) {
     const group = new THREE.Group();
     const isAmbulance = type === 'ambulance';
 
@@ -650,7 +672,7 @@ export class CitySimulation {
       lane,
       speed: 0,
       maxSpeed: isAmbulance ? 16 : 10 + Math.random() * 4,
-      distance: -85, // start way back on lane
+      distance: initialDistance, // configurable initial distance
       type,
       isAmbulance,
       color: carColor,
@@ -886,9 +908,11 @@ export class CitySimulation {
 
   private onWindowResize() {
     if (!this.container) return;
-    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+    const width = this.container.clientWidth || window.innerWidth || 1280;
+    const height = this.container.clientHeight || window.innerHeight || 800;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    this.renderer.setSize(width, height);
   }
 
   // --------------------------------------------------------------------------
